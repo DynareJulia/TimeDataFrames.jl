@@ -1,4 +1,9 @@
-name = "TimeDataFrame"
+name = "TimeDataFrames"
 uuid = "ff13af16-2f41-468a-a2e1-aff5c43aabf7"
 authors = ["michel "]
 version = "0.1.0"
+
+[deps]
+CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+Periods = "0c1d1a06-9168-427d-90e3-b4d73349562f"
