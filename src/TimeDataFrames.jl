@@ -13,14 +13,14 @@ end;
 function TimeDataFrame(dataframe::AbstractDataFrame, frequency::Periods.Frequency, firstperiod)
     data = dataframe
     continuous = true
-    data.Periods = [Periods(firstperiod + i - 1, 0, Periods.Year) for i in 1:dataframe.nrow] 
+    data.Periods = [Period(firstperiod + i - 1, 0, Year) for i in 1:dataframe.nrow] 
     TimeDataFrame(dataframe, true, frequency) 
 end
 
-function TimeDataFrame(filename::String, frequency::Periods.Frequency, firstperiod)
+function TimeDataFrame(filename::String, frequency::Frequency, firstperiod)
     data = DataFrame(CSV.File(filename))
     continuous = true
-    data.periods = [Periods.SimplePeriod(firstperiod + i - 1, 0, Periods.Year) for i in 1:nrow(data)] 
+    data.periods = [Period(firstperiod + i - 1, 0, Year) for i in 1:nrow(data)] 
     TimeDataFrame(data, true, frequency) 
 end
 
