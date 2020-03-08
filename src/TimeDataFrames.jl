@@ -17,16 +17,15 @@ TimeDataFrame() = TimeDataFrame(DataFrame(), true, Undated)
 TimeDataFrame(frequency::Frequency) = TimeDataFrame(DataFrame(), true, frequency)
 
 function TimeDataFrame(dataframe::AbstractDataFrame, frequency::Frequency, firstperiod)
-    data = dataframe
     continuous = true
-    data.Periods = [Period(firstperiod + i - 1, 0, Year) for i in 1:dataframe.nrow] 
+    dataframe.periods = [Period(firstperiod + i - 1, 0, frequency) for i in 1:DataFrames.nrow(dataframe)] 
     TimeDataFrame(dataframe, true, frequency) 
 end
 
 function TimeDataFrame(filename::String, frequency::Frequency, firstperiod)
     data = DataFrame(CSV.File(filename))
     continuous = true
-    data.periods = [Period(firstperiod + i - 1, 0, Year) for i in 1:nrow(data)] 
+    data.periods = [Period(firstperiod + i - 1, 0, Year) for i in 1:size(data, 1)] 
     TimeDataFrame(data, true, frequency) 
 end
 
@@ -40,6 +39,70 @@ function Base.getproperty(tdf::TimeDataFrame, symbol::Symbol)
     TimeDataFrame(DataFrame(periods = periods, symbol = x ),  continuous, frequency)
 end
 
-Base.setproperty!(tdf::TimeDataFrame, symbol::Symbol, x::AbstractArray) = setproperty!(getfield(tdf, :data), symbol, x)
+names(df::TimeDataFrame) = names(getfield(df, :data))
+
+function Base.setproperty!(tdf::TimeDataFrame, symbol::Symbol, x::AbstractArray)
+    data = getfield(tdf, :data)
+    data[!, symbol] = x
+    continuous = getfield(tdf, :continuous)
+    frequency = getfield(tdf, :frequency)
+    TimeDataFrame(data, continusous, frequency)
+end
+
+function Base.setproperty!(tdf1::TimeDataFrame, col_ind::Symbol, tdf2::TimeDataFrame)
+    n1 = nrow(tdf1)
+    n2 = nrow(tdf2)
+    frequency2 = getfield(tdf2, :frequency)
+    continuous2 = getfield(tdf2, :continuous)
+    data1 = getfield(tdf1, :data)
+    data2 = getfield(tdf2, :data)
+    if ncol(tdf1) == 0
+        frequency = frequency2
+        continuous = continuous2
+    else
+        frequency1 = getfield(tdf1, :frequency)
+        continuous1 = getfield(tdf1, :continuous)
+        if frequency1 != frequency2
+            error("The frequency must be the same in both TimeDataFrame")
+        end
+        periods1 = getfield(data1, :periods)
+        periods2 = getfield(data2, :periods)
+        minperiod = (period1[1] < period2[1]) ? periods1[1] : periods2[1]
+        maxperiod = (period1[n1] > period2[n2]) ? periods1[n1] : periods2[n2]
+        # Missing expanding number of periods in data1 if necessary
+    end
+    if !(col_ind in DataFrames.names(data1))
+        insertcols!(data1, 1, col_ind => missings(n2))
+    end
+    setindex!(data1, data2[!, col_ind], periods2[1]:periods2[n2], col_ind)
+    TimeDataFrame(data1, continuous2, frequency2) 
+end
+
+Base.getindex(df::TimeDataFrame, id1::Integer, id2::Integer) = getindex(getfield(df, :data), id1, id2)
+Base.getindex(df::TimeDataFrame, idx::CartesianIndex{2}) = df[idx[1], idx[2]]
+Base.view(df::TimeDataFrame, idx::CartesianIndex{2}) = view(df, idx[1], idx[2])
+Base.setindex!(df::TimeDataFrame, val, idx::CartesianIndex{2}) =
+    (df[idx[1], idx[2]] = val)
+
+Base.broadcastable(df::TimeDataFrame) = df
+Base.ndims(::TimeDataFrame) = 2
+Base.ndims(::Type{<:TimeDataFrame}) = 2
+index(df::TimeDataFrame) = getfield(getfield(df, :data), :colindex)
+_columns(df::TimeDataFrame) = getfield(getfield(df, :data), :columns)
+
+# note: these type assertions are required to pass tests
+ncol(df::TimeDataFrame) = length(index(df))
+nrow(df::TimeDataFrame) = ncol(df) > 0 ? length(_columns(df)[1])::Int : 0
+import Base.size
+Base.size(df::TimeDataFrame) = (nrow(df), ncol(df))
+function Base.size(df::TimeDataFrame, i::Integer)
+    if i == 1
+        nrow(df)
+    elseif i == 2
+        ncol(df)
+    else
+        throw(ArgumentError("DataFrames only have two dimensions"))
+    end
+end
 
 end # module
