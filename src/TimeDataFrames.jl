@@ -8,45 +8,48 @@ export TimeDataFrame
 
 struct TimeDataFrame
     data::DataFrame
+    periods::Vector{Period}
     continuous::Bool
     frequency::Frequency
 end;
 
-TimeDataFrame() = TimeDataFrame(DataFrame(), true, Undated)
+TimeDataFrame() = TimeDataFrame(DataFrame(), Vector{Period}(), true, Undated)
 
-TimeDataFrame(frequency::Frequency) = TimeDataFrame(DataFrame(), true, frequency)
+TimeDataFrame(frequency::Frequency) = TimeDataFrame(DataFrame(), Vector{Period}(), true, frequency)
 
 function TimeDataFrame(dataframe::AbstractDataFrame, frequency::Frequency, firstperiod)
-    continuous = true
-    dataframe.periods = [Period(firstperiod + i - 1, 0, frequency) for i in 1:DataFrames.nrow(dataframe)] 
-    TimeDataFrame(dataframe, true, frequency) 
+    periods = [Period(firstperiod + i - 1, 0, frequency)  for i in 1:DataFrames.nrow(dataframe)]
+    TimeDataFrame(dataframe, periods, true, frequency) 
 end
 
 function TimeDataFrame(filename::String, frequency::Frequency, firstperiod)
     data = DataFrame(CSV.File(filename))
     continuous = true
-    data.periods = [Period(firstperiod + i - 1, 0, Year) for i in 1:size(data, 1)] 
-    TimeDataFrame(data, true, frequency) 
+    periods = [Period(firstperiod + i - 1, 0, Year) for i in 1:size(data, 1)] 
+    TimeDataFrame(data, periods, true, frequency) 
 end
 
 # Redefining getproperty breaks tdf.data !
 function Base.getproperty(tdf::TimeDataFrame, symbol::Symbol)
     data = getfield(tdf, :data)
     x = getproperty(data, symbol)
-    periods = getproperty(data, :periods)
+    periods = getfield(tdf, :periods)
     continuous = getfield(tdf, :continuous)
     frequency = getfield(tdf, :frequency)
-    TimeDataFrame(DataFrame(periods = periods, symbol = x ),  continuous, frequency)
+    df = DataFrame()
+    df[!, symbol] = x
+    TimeDataFrame(df,  periods, continuous, frequency)
 end
 
 names(df::TimeDataFrame) = names(getfield(df, :data))
 
-function Base.setproperty!(tdf::TimeDataFrame, symbol::Symbol, x::AbstractArray)
+function Base.setproperty!(tdf::TimeDataFrame, symbol::Symbol, x::AbstractVector)
     data = getfield(tdf, :data)
+    periods = getfield(tdf, :periods)
     data[!, symbol] = x
     continuous = getfield(tdf, :continuous)
     frequency = getfield(tdf, :frequency)
-    TimeDataFrame(data, continusous, frequency)
+    TimeDataFrame(data, periods, continuous, frequency)
 end
 
 function Base.setproperty!(tdf1::TimeDataFrame, col_ind::Symbol, tdf2::TimeDataFrame)
@@ -56,26 +59,24 @@ function Base.setproperty!(tdf1::TimeDataFrame, col_ind::Symbol, tdf2::TimeDataF
     continuous2 = getfield(tdf2, :continuous)
     data1 = getfield(tdf1, :data)
     data2 = getfield(tdf2, :data)
+    periods2 = getfield(tdf2, :periods)
     if ncol(tdf1) == 0
-        frequency = frequency2
-        continuous = continuous2
+        insertcols!(data1, 1, col_ind => missings(n2))
     else
         frequency1 = getfield(tdf1, :frequency)
         continuous1 = getfield(tdf1, :continuous)
         if frequency1 != frequency2
             error("The frequency must be the same in both TimeDataFrame")
         end
-        periods1 = getfield(data1, :periods)
-        periods2 = getfield(data2, :periods)
+        periods1 = getfield(tdf1, :periods)
         minperiod = (period1[1] < period2[1]) ? periods1[1] : periods2[1]
         maxperiod = (period1[n1] > period2[n2]) ? periods1[n1] : periods2[n2]
         # Missing expanding number of periods in data1 if necessary
     end
-    if !(col_ind in DataFrames.names(data1))
-        insertcols!(data1, 1, col_ind => missings(n2))
-    end
-    setindex!(data1, data2[!, col_ind], periods2[1]:periods2[n2], col_ind)
-    TimeDataFrame(data1, continuous2, frequency2) 
+#    if !(col_ind in DataFrames.names(data1))
+#    end
+#    setindex!(data1, data2[!, 1], periods2[1]:periods2[n2], col_ind)
+    TimeDataFrame(data1, periods2, continuous2, frequency2) 
 end
 
 Base.getindex(df::TimeDataFrame, id1::Integer, id2::Integer) = getindex(getfield(df, :data), id1, id2)
