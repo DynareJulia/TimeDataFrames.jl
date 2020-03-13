@@ -6,7 +6,7 @@ using Periods
 
 export TimeDataFrame
 
-struct TimeDataFrame
+mutable struct TimeDataFrame
     data::DataFrame
     periods::Vector{Period}
     continuous::Bool
@@ -41,7 +41,8 @@ function Base.getproperty(tdf::TimeDataFrame, symbol::Symbol)
     TimeDataFrame(df,  periods, continuous, frequency)
 end
 
-names(df::TimeDataFrame) = names(getfield(df, :data))
+Base.names(tdf::TimeDataFrame) = DataFrames.names(DataFrames.index(getfield(tdf, :data)))
+_names(tdf::TimeDataFrame) = DataFrames._names(DataFrames.index(getfield(tdf, :data)))
 
 function Base.setproperty!(tdf::TimeDataFrame, symbol::Symbol, x::AbstractVector)
     data = getfield(tdf, :data)
@@ -69,21 +70,34 @@ function Base.setproperty!(tdf1::TimeDataFrame, col_ind::Symbol, tdf2::TimeDataF
             error("The frequency must be the same in both TimeDataFrame")
         end
         periods1 = getfield(tdf1, :periods)
-        minperiod = (period1[1] < period2[1]) ? periods1[1] : periods2[1]
-        maxperiod = (period1[n1] > period2[n2]) ? periods1[n1] : periods2[n2]
+        minperiod = (periods1[1] < periods2[1]) ? periods1[1] : periods2[1]
+        maxperiod = (periods1[n1] > periods2[n2]) ? periods1[n1] : periods2[n2]
         # Missing expanding number of periods in data1 if necessary
     end
 #    if !(col_ind in DataFrames.names(data1))
 #    end
-#    setindex!(data1, data2[!, 1], periods2[1]:periods2[n2], col_ind)
-    TimeDataFrame(data1, periods2, continuous2, frequency2) 
+    setindex!(data1, data2[!, 1], ! , col_ind)
+#    rename!(data1, [col_ind])
+    setfield!(tdf1, :data, data1)
+    setfield!(tdf1, :periods, periods2)
+    setfield!(tdf1, :continuous, continuous2)
+    setfield!(tdf1, :frequency, frequency2)
 end
 
 Base.getindex(df::TimeDataFrame, id1::Integer, id2::Integer) = getindex(getfield(df, :data), id1, id2)
 Base.getindex(df::TimeDataFrame, idx::CartesianIndex{2}) = df[idx[1], idx[2]]
+Base.getindex(df::TimeDataFrame, ::typeof(!), col_ind::Symbol) = getindex(getfield(df, :data), !, col_ind)
+Base.getindex(df::TimeDataFrame, ::typeof(!), col_ind::Union{Signed, Unsigned}) = getindex(getfield(df, :data), !, col_ind)
+
 Base.view(df::TimeDataFrame, idx::CartesianIndex{2}) = view(df, idx[1], idx[2])
-Base.setindex!(df::TimeDataFrame, val, idx::CartesianIndex{2}) =
-    (df[idx[1], idx[2]] = val)
+Base.setindex!(tdf::TimeDataFrame, val, idx::CartesianIndex{2}) =
+    (tdf[idx[1], idx[2]] = val)
+Base.setindex!(tdf::TimeDataFrame, x::AbstractArray{Float64, 1}, ::typeof(!), col_ind::Symbol) =
+               setindex!(getfield(tdf, :data), x, !, col_ind)
+Base.setindex!(tdf::TimeDataFrame, x::AbstractArray{Union{Missing, Float64}, 1}, ::typeof(!), col_ind::Symbol) =
+               setindex!(getfield(tdf, :data), x, !, col_ind)
+Base.setindex!(tdf::TimeDataFrame, x::AbstractArray{Float64, 1}, ::typeof(!), col_ind::Union{Signed, Unsigned}) =
+    setindex!(getfield(tdf, :data), x, !, col_ind)
 
 Base.broadcastable(tdf::TimeDataFrame) = tdf
 struct TimeDataFrameStyle <: Base.Broadcast.BroadcastStyle end
@@ -95,15 +109,59 @@ Base.Broadcast.BroadcastStyle(::TimeDataFrameStyle, ::Base.Broadcast.BroadcastSt
 Base.Broadcast.BroadcastStyle(::Base.Broadcast.BroadcastStyle, ::TimeDataFrameStyle) = TimeDataFrameStyle()
 Base.Broadcast.BroadcastStyle(::TimeDataFrameStyle, ::TimeDataFrameStyle) = TimeDataFrameStyle()
 
+function copyto_widen!(res::AbstractVector{T}, bc::Base.Broadcast.Broadcasted,
+                       pos, col) where T
+    for i in pos:length(axes(bc)[1])
+        val = bc[CartesianIndex(i, col)]
+        S = typeof(val)
+        if S <: T || promote_type(S, T) <: T
+            res[i] = val
+        else
+            newres = similar(Vector{promote_type(S, T)}, length(res))
+            copyto!(newres, 1, res, 1, i-1)
+            newres[i] = val
+            return copyto_widen!(newres, bc, i + 1, col)
+        end
+    end
+    return res
+end
+
+function getcolbc(bcf::Base.Broadcast.Broadcasted{Style}, colind) where {Style}
+    # we assume that bcf is already flattened and unaliased
+    newargs = map(bcf.args) do x
+        Base.Broadcast.extrude(x isa TimeDataFrame ? x[!, colind] : x)
+    end
+    Base.Broadcast.Broadcasted{Style}(bcf.f, newargs, bcf.axes)
+end
+
 function Base.copy(bc::Base.Broadcast.Broadcasted{TimeDataFrameStyle})
     ndim = length(axes(bc))
     if ndim != 2
         throw(DimensionMismatch("cannot broadcast a time data frame into $ndim dimensions"))
     end
 
-    data 
+    
     bcf = Base.Broadcast.flatten(bc)
-    colnames = unique!([_names(df) for df in bcf.args if df isa AbstractDataFrame])
+    first_tdf = true
+    local periods, continuous, frequency
+    colnames = []
+    for tdf in bcf.args
+        if tdf isa TimeDataFrame
+            if first_tdf
+                periods = getfield(tdf, :periods)
+                continuous = getfield(tdf, :continuous)
+                frequency = getfield(tdf, :frequency)
+                first_tdf = false
+            elseif getfield(tdf, :periods) != periods
+                error("Time data frames don't have the same periods")
+            elseif getfield(tdf, :continuous) != continuous
+                error("TimeDataFrames don't have the same continuous status")
+            elseif getfield(tdf, :frequency) != frequency
+                error("TimdeDataFrames don't have the same frequency")
+            end
+        end
+    end            
+    colnames = unique!([_names(df) for df in bcf.args if df isa TimeDataFrame])
     if length(colnames) != 1
         wrongnames = setdiff(union(colnames...), intersect(colnames...))
         if isempty(wrongnames)
@@ -116,7 +174,7 @@ function Base.copy(bc::Base.Broadcast.Broadcasted{TimeDataFrameStyle})
         end
     end
     nrows = length(axes(bcf)[1])
-    df = DataFrame()
+    tdf = TimeDataFrame(DataFrame(), periods, continuous, frequency)
     for i in axes(bcf)[2]
         if nrows == 0
             col = Any[]
@@ -127,9 +185,9 @@ function Base.copy(bc::Base.Broadcast.Broadcasted{TimeDataFrameStyle})
             startcol[1] = v1
             col = copyto_widen!(startcol, bcf′, 2, i)
         end
-        df[!, colnames[1][i]] = col
+        tdf[!, colnames[1][i]] = col
     end
-    return df
+    return tdf
 end
 
 
