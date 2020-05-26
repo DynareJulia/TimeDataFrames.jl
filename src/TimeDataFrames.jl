@@ -123,9 +123,9 @@ TimeDataFrame(columns::AbstractMatrix, frequency::Frequency, firstperiod,
               TimeDataFrame(DataFrame(AbstractVector[columns[:, i] for i in 1:size(columns, 2)], cnames,
                                       makeunique=makeunique, copycols=false), frequency, firstperiod)
 
-TimeDataFrame(columns::AbstractMatrix, cnames::AbstractVector{<:AbstractString};
-          makeunique::Bool=false) =
-              TimeDataFrame(DataFrame(columns, Symbol.(cnames); makeunique=makeunique), frequency, firstperiod)
+TimeDataFrame(columns::AbstractMatrix, cnames::AbstractVector{<:AbstractString}, frequency::Frequency, firstperiod;
+              makeunique::Bool=false) =
+                  TimeDataFrame(DataFrame(columns, Symbol.(cnames); makeunique=makeunique), frequency, firstperiod)
 
 TimeDataFrame(column_eltypes::AbstractVector{T}, cnames::AbstractVector{Symbol},
               frequency::Frequency, firstperiod, nrows::Integer=0; makeunique::Bool=false) where T<:Type =
