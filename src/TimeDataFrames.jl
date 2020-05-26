@@ -20,12 +20,19 @@ TimeDataFrame(frequency::Frequency) = TimeDataFrame(DataFrame(),
                                                     Vector{Period}(), true, frequency)
 
 function TimeDataFrame(dataframe::AbstractDataFrame, frequency::Frequency, firstperiod;
-                       copycol::Bool=true)
+                       copycols::Bool=true)
     periods = [Period(firstperiod + i - 1, 0, frequency)  for i in 1:DataFrames.nrow(dataframe)]
     TimeDataFrame(DataFrame(dataframe; copycols), periods, true, frequency) 
 end
 
-function TimeDataFrame(filename::String, frequency::Frequency, firstperiod)
+function TimeDataFrame(filename::String, frequency::Frequency, firstperiod::Integer)
+    data = DataFrame(CSV.File(filename))
+    continuous = true
+    periods = [Period(firstperiod + i - 1, 0, Year) for i in 1:size(data, 1)] 
+    TimeDataFrame(data, periods, true, frequency) 
+end
+
+function TimeDataFrame(filename::String, frequency::Frequency, firstperiod::Integer)
     data = DataFrame(CSV.File(filename))
     continuous = true
     periods = [Period(firstperiod + i - 1, 0, Year) for i in 1:size(data, 1)] 
