@@ -32,14 +32,6 @@ function TimeDataFrame(filename::String, frequency::Frequency, firstperiod::Inte
     TimeDataFrame(data, periods, true, frequency) 
 end
 
-function TimeDataFrame(filename::String, frequency::Frequency, firstperiod::Integer)
-    data = DataFrame(CSV.File(filename))
-    continuous = true
-    periods = [Period(firstperiod + i - 1, 0, Year) for i in 1:size(data, 1)] 
-    TimeDataFrame(data, periods, true, frequency) 
-end
-
-
 TimeDataFrame(frequency::Frequency, firstperiod, pairs::Pair{Symbol,<:Any}...;
               makeunique::Bool=false, copycols::Bool=true) =
                   TimeDataFrame(DataFrame(pairs; makeunique, copycols),
