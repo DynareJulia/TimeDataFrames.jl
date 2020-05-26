@@ -13,9 +13,11 @@ mutable struct TimeDataFrame
     frequency::Frequency
 end;
 
-TimeDataFrame() = TimeDataFrame(DataFrame(), Vector{Period}(), true, Undated)
+TimeDataFrame() = TimeDataFrame(DataFrame(), Vector{Period}(), true,
+                                Undated)
 
-TimeDataFrame(frequency::Frequency) = TimeDataFrame(DataFrame(), Vector{Period}(), true, frequency)
+TimeDataFrame(frequency::Frequency) = TimeDataFrame(DataFrame(),
+                                                    Vector{Period}(), true, frequency)
 
 function TimeDataFrame(dataframe::AbstractDataFrame, frequency::Frequency, firstperiod)
     periods = [Period(firstperiod + i - 1, 0, frequency)  for i in 1:DataFrames.nrow(dataframe)]
@@ -28,6 +30,115 @@ function TimeDataFrame(filename::String, frequency::Frequency, firstperiod)
     periods = [Period(firstperiod + i - 1, 0, Year) for i in 1:size(data, 1)] 
     TimeDataFrame(data, periods, true, frequency) 
 end
+
+TimeDataFrame(df::DataFrame, frequency::Frequency, firstperiod;
+              copycols::Bool=true) =
+                  TimeDataFrame(DataFrame(df; copycols),
+                                frequency, firstperiod)
+
+TimeDataFrame(frequency::Frequency, firstperiod, pairs::Pair{Symbol,<:Any}...;
+              makeunique::Bool=false, copycols::Bool=true) =
+                  TimeDataFrame(DataFrame(pairs; makeunique, copycols),
+                                frequency, firstperiod)
+
+TimeDataFrame(frequency::Frequency, firstperiod, pairs::Pair{<:AbstractString,<:Any}...;
+              makeunique::Bool=false, copycols::Bool=true) =
+                  TimeDataFrame(DataFrame(pairs; makeunique, copycols),
+                                frequency, firstperiod)
+
+# these two are needed as a workaround Tables.jl dispatch
+TimeDataFrame(pairs::AbstractVector{<:Pair}, frequency::Frequency, firstperiod; makeunique::Bool=false,
+              copycols::Bool=true) =
+                  TimeDataFrame(DataFrame(pairs..., makeunique=makeunique, copycols=copycols),
+                                frequency, firstperiod)
+
+TimeDataFrame(pairs::NTuple{N, Pair}, frequency::Frequency, firstperiod; makeunique::Bool=false,
+              copycols::Bool=true) where {N} =
+                  TimeDataFrame(DataFrame(pairs..., makeunique=makeunique, copycols=copycols),
+                                frequency, firstperiod) 
+
+TimeDataFrame(d::AbstractDict, frequency::Frequency, firstperiod; copycols::Bool=true) =
+    TimeDataFrame(DataFrame(d; copycols), frequency, firstperiod)
+
+#=
+TimeDataFrame(frequency::Frequency, firstperiod; kwargs...)
+    if isempty(kwargs)
+        TimeDataFrame()
+    else
+        cnames = Symbol[]
+        columns = Any[]
+        copycols = true
+        for (kw, val) in kwargs
+            if kw == :copycols
+                if val isa Bool
+                    copycols = val
+                else
+                    throw(ArgumentError("the `copycols` keyword argument must be Boolean"))
+                end
+            else
+                push!(cnames, kw)
+                push!(columns, val)
+            end
+        end
+        TimeDataFrame(DataFrame(columns, Index(cnames), copycols=copycols), Undated, 1)
+    end
+end
+=#
+
+TimeDataFrame(columns::AbstractVector, cnames::AbstractVector{Symbol}, frequency::Frequency,
+              firstperiod; makeunique::Bool=false, copycols::Bool=true) =
+                  TimeDataFrame(DataFrame(columns, cnames; makeunique, copycols), frequency, firstperiod)
+
+TimeDataFrame(columns::AbstractVector, cnames::AbstractVector{<:AbstractString}, frequency::Frequency,
+              firstperiod; makeunique::Bool=false, copycols::Bool=true) =
+                  TimeDataFrame(DataFrame(columns, Symbol.(cnames), makeunique=makeunique, copycols=copycols),
+                                frequency, firstperiod)
+
+TimeDataFrame(columns::AbstractVector{<:AbstractVector}, frequency::Frequency, firstperiod,
+              cnames::AbstractVector{Symbol}=gennames(length(columns));
+              makeunique::Bool=false, copycols::Bool=true) =
+                  TimeDataFrame(DataFrame(collect(AbstractVector, columns),
+                                          Index(convert(Vector{Symbol}, cnames), makeunique=makeunique),
+                                          copycols=copycols), frequency, firstperiod)
+
+TimeDataFrame(columns::AbstractVector{<:AbstractVector},
+              cnames::AbstractVector{<:AbstractString}, frequency::Frequency, firstperiod;
+              makeunique::Bool=false, copycols::Bool=true) =
+                  TimeDataFrame(DataFrame(columns, Symbol.(cnames); makeunique=makeunique, copycols=copycols),
+                                frequency, firstperiod)
+
+TimeDataFrame(columns::NTuple{N, AbstractVector}, cnames::NTuple{N, Symbol}, frequency::Frequency, firstperiod;
+              makeunique::Bool=false, copycols::Bool=true) where {N} =
+                  TimeDataFrame(DataFrame(collect(AbstractVector, columns), collect(Symbol, cnames),
+                                          makeunique=makeunique, copycols=copycols), frequency, firstperiod)
+
+TimeDataFrame(columns::NTuple{N, AbstractVector}, cnames::NTuple{N, AbstractString}, frequency::Frequency, firstperiod;
+          makeunique::Bool=false, copycols::Bool=true) where {N} =
+              TimeDataFrame(DataFrame(columns, Symbol.(cnames); makeunique=makeunique, copycols=copycols), frequency,
+                            firstperiod)
+
+TimeDataFrame(columns::NTuple{N, AbstractVector}, frequency::Frequency, firstperiod; copycols::Bool=true) where {N} =
+    TimeDataFrame(DataFrame(collect(AbstractVector, columns), gennames(length(columns)),
+                            copycols=copycols), frequency, firstperiod)
+
+TimeDataFrame(columns::AbstractMatrix, frequency::Frequency, firstperiod,
+          cnames::AbstractVector{Symbol} = gennames(size(columns, 2)); makeunique::Bool=false) =
+              TimeDataFrame(DataFrame(AbstractVector[columns[:, i] for i in 1:size(columns, 2)], cnames,
+                                      makeunique=makeunique, copycols=false), frequency, firstperiod)
+
+TimeDataFrame(columns::AbstractMatrix, cnames::AbstractVector{<:AbstractString};
+          makeunique::Bool=false) =
+              TimeDataFrame(DataFrame(columns, Symbol.(cnames); makeunique=makeunique), frequency, firstperiod)
+
+TimeDataFrame(column_eltypes::AbstractVector{T}, cnames::AbstractVector{Symbol},
+              frequency::Frequency, firstperiod, nrows::Integer=0; makeunique::Bool=false) where T<:Type =
+                  TimeDataFrame(DataFrame(column_eltypes, cnames, nrows; makeunique), frequency, firstperiod)
+
+TimeDataFrame(column_eltypes::AbstractVector{<:Type},
+              cnames::AbstractVector{<:AbstractString},
+              frequency::Frequency, firstperiod, nrows::Integer=0; makeunique::Bool=false) =
+                  TimeDataFrame(DataFrame(column_eltypes, Symbol.(cnames), nrows; makeunique=makeunique), frequency,
+                                firstperiod)
 
 # Redefining getproperty breaks tdf.data !
 function Base.getproperty(tdf::TimeDataFrame, symbol::Symbol)
