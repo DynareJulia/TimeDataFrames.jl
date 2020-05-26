@@ -19,9 +19,10 @@ TimeDataFrame() = TimeDataFrame(DataFrame(), Vector{Period}(), true,
 TimeDataFrame(frequency::Frequency) = TimeDataFrame(DataFrame(),
                                                     Vector{Period}(), true, frequency)
 
-function TimeDataFrame(dataframe::AbstractDataFrame, frequency::Frequency, firstperiod)
+function TimeDataFrame(dataframe::AbstractDataFrame, frequency::Frequency, firstperiod;
+                       copycol::Bool=true)
     periods = [Period(firstperiod + i - 1, 0, frequency)  for i in 1:DataFrames.nrow(dataframe)]
-    TimeDataFrame(dataframe, periods, true, frequency) 
+    TimeDataFrame(DataFrame(dataframe; copycols), periods, true, frequency) 
 end
 
 function TimeDataFrame(filename::String, frequency::Frequency, firstperiod)
@@ -31,10 +32,6 @@ function TimeDataFrame(filename::String, frequency::Frequency, firstperiod)
     TimeDataFrame(data, periods, true, frequency) 
 end
 
-TimeDataFrame(df::DataFrame, frequency::Frequency, firstperiod;
-              copycols::Bool=true) =
-                  TimeDataFrame(DataFrame(df; copycols),
-                                frequency, firstperiod)
 
 TimeDataFrame(frequency::Frequency, firstperiod, pairs::Pair{Symbol,<:Any}...;
               makeunique::Bool=false, copycols::Bool=true) =
