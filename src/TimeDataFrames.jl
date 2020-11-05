@@ -4,7 +4,7 @@ using CSV
 using DataFrames
 using Periods
 
-export TimeDataFrame
+export TimeDataFrame, innerjoin, outerjoin
 
 mutable struct TimeDataFrame
     data::DataFrame
@@ -318,6 +318,36 @@ function Base.size(df::TimeDataFrame, i::Integer)
     else
         throw(ArgumentError("DataFrames only have two dimensions"))
     end
+end
+
+function innerjoin(d1::TimeDataFrame, d2::TimeDataFrame)
+    freq1 = getfield(d1, :frequency)
+    freq2 = getfield(d2, :frequency)
+    if freq1 != freq2
+        error("innerjoin: both TimeDataFrames must have the same frequency")
+    end
+    continuous1 = getfield(d1, :continuous)
+    continuous2 = getfield(d2, :continuous)
+    data1 = getfield(d1, :data)
+    data2 = getfield(d2, :data)
+    periods1 = getfield(d1, :periods)
+    periods2 = getfield(d2, :periods)
+    return TimeDataFrame(sort!(DataFrames.innerjoin(data1, data2, on=:Column1),1), intersect(periods1, periods2), true, freq1)
+end
+
+function outerjoin(d1::TimeDataFrame, d2::TimeDataFrame)
+    freq1 = getfield(d1, :frequency)
+    freq2 = getfield(d2, :frequency)
+    if freq1 != freq2
+        error("innerjoin: both TimeDataFrames must have the same frequency")
+    end
+    continuous1 = getfield(d1, :continuous)
+    continuous2 = getfield(d2, :continuous)
+    data1 = getfield(d1, :data)
+    data2 = getfield(d2, :data)
+    periods1 = getfield(d1, :periods)
+    periods2 = getfield(d2, :periods)
+    return TimeDataFrame(sort!(DataFrames.outerjoin(data1, data2, on=:Column1),1), union(periods1, periods2), true, freq1)
 end
 
 end # module
