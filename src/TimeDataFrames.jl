@@ -21,7 +21,7 @@ TimeDataFrame(frequency::Frequency) = TimeDataFrame(DataFrame(),
 
 function TimeDataFrame(dataframe::AbstractDataFrame, frequency::Frequency, firstperiod;
                        copycols::Bool=true)
-    periods = [Period(firstperiod + i - 1, 0, frequency)  for i in 1:DataFrames.nrow(dataframe)]
+    periods = [Period(firstperiod + i - 1, frequency)  for i in 1:DataFrames.nrow(dataframe)]
     TimeDataFrame(DataFrame(dataframe; copycols), periods, true, frequency) 
 end
 
