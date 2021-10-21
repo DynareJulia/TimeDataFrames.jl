@@ -2,62 +2,63 @@ module TimeDataFrames
 
 using CSV
 using DataFrames
-using Periods
+using ExtendedDates
 
 export TimeDataFrame, innerjoin, outerjoin
 
 mutable struct TimeDataFrame
     data::DataFrame
-    periods::Vector{Period}
+    periods::AbstractVector{ExtendedDates.SimpleDate}
     continuous::Bool
-    frequency::Frequency
+    function TimeDataFrame(data::DataFrame,
+                           periods::AbstractVector{T},
+                           continuous::Bool) where T <: ExtendedDates.SimpleDate
+        new(data, periods, continuous)
+    end
 end;
 
-TimeDataFrame() = TimeDataFrame(DataFrame(), Vector{Period}(), true,
-                                Undated)
+    
+TimeDataFrame() = TimeDataFrame(DataFrame(), Vector{T}(), true) where T <: ExtendedDates.SimpleDate
 
-TimeDataFrame(frequency::Frequency) = TimeDataFrame(DataFrame(),
-                                                    Vector{Period}(), true, frequency)
-
-function TimeDataFrame(dataframe::AbstractDataFrame, frequency::Frequency, firstperiod;
-                       copycols::Bool=true)
-    periods = [Period(firstperiod + i - 1, frequency)  for i in 1:DataFrames.nrow(dataframe)]
-    TimeDataFrame(DataFrame(dataframe; copycols), periods, true, frequency) 
+function TimeDataFrame(dataframe::AbstractDataFrame, firstperiod::T;
+                       copycols::Bool=true) where T <: ExtendedDates.SimpleDate
+    periods = range(firstperiod, length=DataFrames.nrow(dataframe), step = typeof(firstperiod - firstperiod)(1))
+    TimeDataFrame(DataFrame(dataframe; copycols), periods, true) 
 end
 
-function TimeDataFrame(filename::String, frequency::Frequency, firstperiod::Integer)
+function TimeDataFrame(filename::String, firstperiod::T) where T <: ExtendedDates.SimpleDate
     data = DataFrame(CSV.File(filename))
     continuous = true
-    periods = [Period(firstperiod + i - 1, 0, Year) for i in 1:size(data, 1)] 
-    TimeDataFrame(data, periods, true, frequency) 
+    periods = range(firstperiod, size(data, 1))
+    TimeDataFrame(data, periods, true) 
 end
 
-TimeDataFrame(frequency::Frequency, firstperiod, pairs::Pair{Symbol,<:Any}...;
-              makeunique::Bool=false, copycols::Bool=true) =
+TimeDataFrame(firstperiod::T, pairs::Pair{Symbol,<:Any}...;
+              makeunique::Bool=false, copycols::Bool=true) where T <: ExtendedDates.SimpleDate =
                   TimeDataFrame(DataFrame(pairs; makeunique, copycols),
-                                frequency, firstperiod)
+                                firstperiod)
 
-TimeDataFrame(frequency::Frequency, firstperiod, pairs::Pair{<:AbstractString,<:Any}...;
-              makeunique::Bool=false, copycols::Bool=true) =
+TimeDataFrame(firstperiod::T, pairs::Pair{<:AbstractString,<:Any}...;
+              makeunique::Bool=false, copycols::Bool=true) where T <: ExtendedDates.SimpleDate =  
                   TimeDataFrame(DataFrame(pairs; makeunique, copycols),
-                                frequency, firstperiod)
+                                firstperiod)
 
 # these two are needed as a workaround Tables.jl dispatch
-TimeDataFrame(pairs::AbstractVector{<:Pair}, frequency::Frequency, firstperiod; makeunique::Bool=false,
-              copycols::Bool=true) =
+TimeDataFrame(pairs::AbstractVector{<:Pair}, firstperiod::T; makeunique::Bool=false,
+              copycols::Bool=true) where T <: ExtendedDates.SimpleDate =
                   TimeDataFrame(DataFrame(pairs..., makeunique=makeunique, copycols=copycols),
-                                frequency, firstperiod)
+                                firstperiod)
 
-TimeDataFrame(pairs::NTuple{N, Pair}, frequency::Frequency, firstperiod; makeunique::Bool=false,
-              copycols::Bool=true) where {N} =
+TimeDataFrame(pairs::NTuple{N, Pair}, firstperiod::T; makeunique::Bool=false,
+              copycols::Bool=true) where {N,T <: ExtendedDates.SimpleDate} =
                   TimeDataFrame(DataFrame(pairs..., makeunique=makeunique, copycols=copycols),
-                                frequency, firstperiod) 
+                                firstperiod) 
 
-TimeDataFrame(d::AbstractDict, frequency::Frequency, firstperiod; copycols::Bool=true) =
-    TimeDataFrame(DataFrame(d; copycols), frequency, firstperiod)
+TimeDataFrame(d::AbstractDict, firstperiod::T; copycols::Bool=true) where T <: ExtendedDates.SimpleDate =
+    TimeDataFrame(DataFrame(d; copycols), firstperiod)
 
 #=
-TimeDataFrame(frequency::Frequency, firstperiod; kwargs...)
+TimeDataFrame(frequency::ExtendedDates.Frequency, firstperiod::ExtendedDates.SimpleDate; kwargs...)
     if isempty(kwargs)
         TimeDataFrame()
     else
@@ -81,59 +82,58 @@ TimeDataFrame(frequency::Frequency, firstperiod; kwargs...)
 end
 =#
 
-TimeDataFrame(columns::AbstractVector, cnames::AbstractVector{Symbol}, frequency::Frequency,
-              firstperiod; makeunique::Bool=false, copycols::Bool=true) =
-                  TimeDataFrame(DataFrame(columns, cnames; makeunique, copycols), frequency, firstperiod)
+TimeDataFrame(columns::AbstractVector, cnames::AbstractVector{Symbol},
+              firstperiod::T; makeunique::Bool=false, copycols::Bool=true) where T <: ExtendedDates.SimpleDate =
+                  TimeDataFrame(DataFrame(columns, cnames; makeunique, copycols), firstperiod)
 
-TimeDataFrame(columns::AbstractVector, cnames::AbstractVector{<:AbstractString}, frequency::Frequency,
-              firstperiod; makeunique::Bool=false, copycols::Bool=true) =
+TimeDataFrame(columns::AbstractVector, cnames::AbstractVector{<:AbstractString},
+              firstperiod::T; makeunique::Bool=false, copycols::Bool=true) where T <: ExtendedDates.SimpleDate =
                   TimeDataFrame(DataFrame(columns, Symbol.(cnames), makeunique=makeunique, copycols=copycols),
-                                frequency, firstperiod)
+                                firstperiod)
 
-TimeDataFrame(columns::AbstractVector{<:AbstractVector}, frequency::Frequency, firstperiod,
+TimeDataFrame(columns::AbstractVector{<:AbstractVector}, firstperiod::T,
               cnames::AbstractVector{Symbol}=gennames(length(columns));
-              makeunique::Bool=false, copycols::Bool=true) =
+              makeunique::Bool=false, copycols::Bool=true) where T <: ExtendedDates.SimpleDate =
                   TimeDataFrame(DataFrame(collect(AbstractVector, columns),
                                           Index(convert(Vector{Symbol}, cnames), makeunique=makeunique),
-                                          copycols=copycols), frequency, firstperiod)
+                                          copycols=copycols), firstperiod)
 
 TimeDataFrame(columns::AbstractVector{<:AbstractVector},
-              cnames::AbstractVector{<:AbstractString}, frequency::Frequency, firstperiod;
-              makeunique::Bool=false, copycols::Bool=true) =
+              cnames::AbstractVector{<:AbstractString}, firstperiod::T;
+              makeunique::Bool=false, copycols::Bool=true) where T <: ExtendedDates.SimpleDate =
                   TimeDataFrame(DataFrame(columns, Symbol.(cnames); makeunique=makeunique, copycols=copycols),
-                                frequency, firstperiod)
+                                firstperiod)
 
-TimeDataFrame(columns::NTuple{N, AbstractVector}, cnames::NTuple{N, Symbol}, frequency::Frequency, firstperiod;
-              makeunique::Bool=false, copycols::Bool=true) where {N} =
+TimeDataFrame(columns::NTuple{N, AbstractVector}, cnames::NTuple{N, Symbol}, firstperiod::T;
+              makeunique::Bool=false, copycols::Bool=true) where {N, T <: ExtendedDates.SimpleDate} =
                   TimeDataFrame(DataFrame(collect(AbstractVector, columns), collect(Symbol, cnames),
-                                          makeunique=makeunique, copycols=copycols), frequency, firstperiod)
+                                          makeunique=makeunique, copycols=copycols), firstperiod)
 
-TimeDataFrame(columns::NTuple{N, AbstractVector}, cnames::NTuple{N, AbstractString}, frequency::Frequency, firstperiod;
-          makeunique::Bool=false, copycols::Bool=true) where {N} =
-              TimeDataFrame(DataFrame(columns, Symbol.(cnames); makeunique=makeunique, copycols=copycols), frequency,
+TimeDataFrame(columns::NTuple{N, AbstractVector}, cnames::NTuple{N, AbstractString}, firstperiod::T;
+          makeunique::Bool=false, copycols::Bool=true) where {N, T <: ExtendedDates.SimpleDate} =
+              TimeDataFrame(DataFrame(columns, Symbol.(cnames); makeunique=makeunique, copycols=copycols),
                             firstperiod)
 
-TimeDataFrame(columns::NTuple{N, AbstractVector}, frequency::Frequency, firstperiod; copycols::Bool=true) where {N} =
+TimeDataFrame(columns::NTuple{N, AbstractVector}, firstperiod::T; copycols::Bool=true) where {N, T <: ExtendedDates.SimpleDate} =
     TimeDataFrame(DataFrame(collect(AbstractVector, columns), gennames(length(columns)),
-                            copycols=copycols), frequency, firstperiod)
+                            copycols=copycols), firstperiod)
 
-TimeDataFrame(columns::AbstractMatrix, frequency::Frequency, firstperiod,
-          cnames::AbstractVector{Symbol} = gennames(size(columns, 2)); makeunique::Bool=false) =
+TimeDataFrame(columns::AbstractMatrix, firstperiod::T,
+          cnames::AbstractVector{Symbol} = gennames(size(columns, 2)); makeunique::Bool=false) where T <: ExtendedDates.SimpleDate =
               TimeDataFrame(DataFrame(AbstractVector[columns[:, i] for i in 1:size(columns, 2)], cnames,
-                                      makeunique=makeunique, copycols=false), frequency, firstperiod)
+                                      makeunique=makeunique, copycols=false), firstperiod)
 
-TimeDataFrame(columns::AbstractMatrix, cnames::AbstractVector{<:AbstractString}, frequency::Frequency, firstperiod;
-              makeunique::Bool=false) =
-                  TimeDataFrame(DataFrame(columns, Symbol.(cnames); makeunique=makeunique), frequency, firstperiod)
+TimeDataFrame(columns::AbstractMatrix, cnames::AbstractVector{<:AbstractString}, firstperiod::T;
+              makeunique::Bool=false) where T <: ExtendedDates.SimpleDate =
+                  TimeDataFrame(DataFrame(columns, Symbol.(cnames); makeunique=makeunique), firstperiod)
 
 TimeDataFrame(column_eltypes::AbstractVector{T}, cnames::AbstractVector{Symbol},
-              frequency::Frequency, firstperiod, nrows::Integer=0; makeunique::Bool=false) where T<:Type =
-                  TimeDataFrame(DataFrame(column_eltypes, cnames, nrows; makeunique), frequency, firstperiod)
+              firstperiod::P, nrows::Integer=0; makeunique::Bool=false) where {T<:Type, P <: ExtendedDates.SimpleDate} =
+                  TimeDataFrame(DataFrame(column_eltypes, cnames, nrows; makeunique), firstperiod)
 
-TimeDataFrame(column_eltypes::AbstractVector{<:Type},
-              cnames::AbstractVector{<:AbstractString},
-              frequency::Frequency, firstperiod, nrows::Integer=0; makeunique::Bool=false) =
-                  TimeDataFrame(DataFrame(column_eltypes, Symbol.(cnames), nrows; makeunique=makeunique), frequency,
+TimeDataFrame(column_eltypes::AbstractVector{T}, cnames::AbstractVector{S}, firstperiod::P,
+              nrows::Integer=0; makeunique::Bool=false) where {T <: Type, P <: ExtendedDates.SimpleDate, S <: AbstractString} =
+                  TimeDataFrame(DataFrame(column_eltypes, Symbol.(cnames), nrows; makeunique=makeunique),
                                 firstperiod)
 
 # Redefining getproperty breaks tdf.data !
@@ -142,10 +142,9 @@ function Base.getproperty(tdf::TimeDataFrame, symbol::Symbol)
     x = getproperty(data, symbol)
     periods = getfield(tdf, :periods)
     continuous = getfield(tdf, :continuous)
-    frequency = getfield(tdf, :frequency)
     df = DataFrame()
     df[!, symbol] = x
-    TimeDataFrame(df,  periods, continuous, frequency)
+    TimeDataFrame(df,  periods, continuous)
 end
 
 Base.names(tdf::TimeDataFrame) = DataFrames.names(DataFrames.index(getfield(tdf, :data)))
@@ -156,14 +155,12 @@ function Base.setproperty!(tdf::TimeDataFrame, symbol::Symbol, x::AbstractVector
     periods = getfield(tdf, :periods)
     data[!, symbol] = x
     continuous = getfield(tdf, :continuous)
-    frequency = getfield(tdf, :frequency)
-    TimeDataFrame(data, periods, continuous, frequency)
+    TimeDataFrame(data, periods, continuous)
 end
 
 function Base.setproperty!(tdf1::TimeDataFrame, col_ind::Symbol, tdf2::TimeDataFrame)
     n1 = nrow(tdf1)
     n2 = nrow(tdf2)
-    frequency2 = getfield(tdf2, :frequency)
     continuous2 = getfield(tdf2, :continuous)
     data1 = getfield(tdf1, :data)
     data2 = getfield(tdf2, :data)
@@ -171,12 +168,11 @@ function Base.setproperty!(tdf1::TimeDataFrame, col_ind::Symbol, tdf2::TimeDataF
     if ncol(tdf1) == 0
         insertcols!(data1, 1, col_ind => missings(n2))
     else
-        frequency1 = getfield(tdf1, :frequency)
         continuous1 = getfield(tdf1, :continuous)
-        if frequency1 != frequency2
+        periods1 = getfield(tdf1, :periods)
+        if typeof(periods1) != typeof(periods2)
             error("The frequency must be the same in both TimeDataFrame")
         end
-        periods1 = getfield(tdf1, :periods)
         minperiod = (periods1[1] < periods2[1]) ? periods1[1] : periods2[1]
         maxperiod = (periods1[n1] > periods2[n2]) ? periods1[n1] : periods2[n2]
         # Missing expanding number of periods in data1 if necessary
@@ -188,7 +184,6 @@ function Base.setproperty!(tdf1::TimeDataFrame, col_ind::Symbol, tdf2::TimeDataF
     setfield!(tdf1, :data, data1)
     setfield!(tdf1, :periods, periods2)
     setfield!(tdf1, :continuous, continuous2)
-    setfield!(tdf1, :frequency, frequency2)
 end
 
 Base.getindex(df::TimeDataFrame, id1::Integer, id2::Integer) = getindex(getfield(df, :data), id1, id2)
@@ -250,21 +245,18 @@ function Base.copy(bc::Base.Broadcast.Broadcasted{TimeDataFrameStyle})
     
     bcf = Base.Broadcast.flatten(bc)
     first_tdf = true
-    local periods, continuous, frequency
+    local periods, continuous
     colnames = []
     for tdf in bcf.args
         if tdf isa TimeDataFrame
             if first_tdf
                 periods = getfield(tdf, :periods)
                 continuous = getfield(tdf, :continuous)
-                frequency = getfield(tdf, :frequency)
                 first_tdf = false
             elseif getfield(tdf, :periods) != periods
                 error("Time data frames don't have the same periods")
             elseif getfield(tdf, :continuous) != continuous
                 error("TimeDataFrames don't have the same continuous status")
-            elseif getfield(tdf, :frequency) != frequency
-                error("TimdeDataFrames don't have the same frequency")
             end
         end
     end            
@@ -281,7 +273,7 @@ function Base.copy(bc::Base.Broadcast.Broadcasted{TimeDataFrameStyle})
         end
     end
     nrows = length(axes(bcf)[1])
-    tdf = TimeDataFrame(DataFrame(), periods, continuous, frequency)
+    tdf = TimeDataFrame(DataFrame(), periods, continuous)
     for i in axes(bcf)[2]
         if nrows == 0
             col = Any[]
@@ -321,33 +313,29 @@ function Base.size(df::TimeDataFrame, i::Integer)
 end
 
 function innerjoin(d1::TimeDataFrame, d2::TimeDataFrame)
-    freq1 = getfield(d1, :frequency)
-    freq2 = getfield(d2, :frequency)
-    if freq1 != freq2
-        error("innerjoin: both TimeDataFrames must have the same frequency")
-    end
     continuous1 = getfield(d1, :continuous)
     continuous2 = getfield(d2, :continuous)
     data1 = getfield(d1, :data)
     data2 = getfield(d2, :data)
     periods1 = getfield(d1, :periods)
     periods2 = getfield(d2, :periods)
-    return TimeDataFrame(sort!(DataFrames.innerjoin(data1, data2, on=:Column1),1), intersect(periods1, periods2), true, freq1)
+    if typeof(periods1) != typeof(periods2)
+        error("innerjoin: both TimeDataFrames must have the same frequency")
+    end
+    return TimeDataFrame(sort!(DataFrames.innerjoin(data1, data2, on=:Column1),1), intersect(periods1, periods2), true)
 end
 
 function outerjoin(d1::TimeDataFrame, d2::TimeDataFrame)
-    freq1 = getfield(d1, :frequency)
-    freq2 = getfield(d2, :frequency)
-    if freq1 != freq2
-        error("innerjoin: both TimeDataFrames must have the same frequency")
-    end
     continuous1 = getfield(d1, :continuous)
     continuous2 = getfield(d2, :continuous)
     data1 = getfield(d1, :data)
     data2 = getfield(d2, :data)
     periods1 = getfield(d1, :periods)
     periods2 = getfield(d2, :periods)
-    return TimeDataFrame(sort!(DataFrames.outerjoin(data1, data2, on=:Column1),1), union(periods1, periods2), true, freq1)
+    if typeof(periods1) != typeof(periods2)
+        error("innerjoin: both TimeDataFrames must have the same frequency")
+    end
+    return TimeDataFrame(sort!(DataFrames.outerjoin(data1, data2, on=:Column1),1), union(periods1, periods2), true)
 end
 
 end # module
