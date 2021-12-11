@@ -4,6 +4,8 @@ using CSV
 using DataFrames
 using ExtendedDates
 
+import Base: show
+
 export TimeDataFrame, innerjoin, outerjoin
 
 mutable struct TimeDataFrame
@@ -337,5 +339,15 @@ function outerjoin(d1::TimeDataFrame, d2::TimeDataFrame)
     end
     return TimeDataFrame(sort!(DataFrames.outerjoin(data1, data2, on=:Column1),1), union(periods1, periods2), true)
 end
+
+function Base.show(io::IO, tdf::TimeDataFrame)
+    df = getfield(tdf, :data)
+    dfcopy = copy(df)
+    periods = getfield(tdf, :periods)
+    insertcols!(dfcopy, 1, :Periods => periods)
+    show(io, dfcopy, show_row_number = false, eltypes = false)
+end
+
+Base.show(tdf::TimeDataFrame) = show(stdout, tdf)
 
 end # module
