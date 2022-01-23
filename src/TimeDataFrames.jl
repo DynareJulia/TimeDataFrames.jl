@@ -345,9 +345,15 @@ function Base.show(io::IO, tdf::TimeDataFrame)
     dfcopy = copy(df)
     periods = getfield(tdf, :periods)
     insertcols!(dfcopy, 1, :Periods => periods)
-    show(io, dfcopy, show_row_number = false, eltypes = false)
+    show(io, dfcopy, show_row_number = false, eltypes = false, summary = false)
 end
 
-Base.show(tdf::TimeDataFrame) = show(stdout, tdf)
+function Base.show(tdf::TimeDataFrame)
+    df = getfield(tdf, :data)
+    dfcopy = copy(df)
+    periods = getfield(tdf, :periods)
+    insertcols!(dfcopy, 1, :Periods => periods)
+    show(dfcopy, show_row_number = false, eltypes = false, summary = false)
+end
 
 end # module
