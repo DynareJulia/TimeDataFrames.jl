@@ -9,4 +9,6 @@ DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 ExtendedDates = "78f5a1cc-aa73-4dda-b6b2-4d6b1976988f"
 
 [compat]
-julia = ">= 1.6.3"
+julia = "1.6.3"
+DataFrames = "1.0.0"
+ExtendedDates = "0.1.1"
