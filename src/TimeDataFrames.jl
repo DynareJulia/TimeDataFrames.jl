@@ -4,9 +4,9 @@ using CSV
 using DataFrames
 using ExtendedDates
 
-import Base: show
+import Base: eachcol, eachrow, show
 
-export TimeDataFrame, innerjoin, outerjoin
+export TimeDataFrame, periods, firstperiod, lastperiod, dataframe, innerjoin, outerjoin, lag, lead, ncol, nrow
 
 mutable struct TimeDataFrame
     data::DataFrame
@@ -31,7 +31,7 @@ end
 function TimeDataFrame(filename::String, firstperiod::T) where T <: ExtendedDates.SimpleDate
     data = DataFrame(CSV.File(filename))
     continuous = true
-    periods = range(firstperiod, size(data, 1))
+    periods = range(firstperiod, length=size(data, 1), step = typeof(firstperiod - firstperiod)(1))
     TimeDataFrame(data, periods, true) 
 end
 
@@ -355,5 +355,16 @@ function Base.show(tdf::TimeDataFrame)
     insertcols!(dfcopy, 1, :Periods => periods)
     show(dfcopy, show_row_number = false, eltypes = false, summary = false)
 end
+
+function Base.isequal(tdf1::TimeDataFrame, tdf2::TimeDataFrame)
+    isequal(getfield(tdf1, :data), getfield(tdf2, :data)) || return false
+    isequal(getfield(tdf1, :periods), getfield(tdf2, :periods)) || return false
+    getfield(tdf1, :continuous) == getfield(tdf2, :continuous) || return false
+    return true
+end
+
+include("accessors.jl")
+include("dataframe_functions.jl")
+include("timeseries_functions.jl")
 
 end # module
