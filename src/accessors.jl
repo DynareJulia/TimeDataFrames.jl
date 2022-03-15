@@ -21,6 +21,7 @@ lastperiod(tdf::TimeDataFrame) = periods(tdf)[end]
 returns the DataFrame inside the TimeDataFrame
 """
 dataframe(tdf::TimeDataFrame) = getfield(tdf, :data)
+<<<<<<< HEAD
 
 """
     continuous(tdf::TimeDataFrame)
@@ -28,3 +29,10 @@ returns whether the TimeDataFrame is continuous
 """
 continuous(tdf::TimeDataFrame) = getfield(tdf, :continuous)
 
+=======
+"""
+    continuous(tdf::TimeDataFrame)
+returns whether the TimeDataFrame is time continuous
+"""
+continuous(tdf::TimeDataFrame) = getfield(tdf, :continuous)
+>>>>>>> 6c1e2a7 (update)

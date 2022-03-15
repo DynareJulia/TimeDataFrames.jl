@@ -361,7 +361,6 @@ function Base.isequal(tdf1::TimeDataFrame, tdf2::TimeDataFrame)
     return true
 end
 
-<<<<<<< HEAD
 """
     copy(tdf::TimeDataFrame; copycols::Bool=true)
 
@@ -428,10 +427,5 @@ export continuous, dataframe, firstperiod, lastperiod, periods
 include("dataframe_functions.jl")
 include("timeseries_functions.jl")
 export lag, lead, align!
-=======
-include("accessors.jl")
-include("dataframe_functions.jl")
-include("timeseries_functions.jl")
->>>>>>> 10e3fa1 (adding functions)
 
 end # module
