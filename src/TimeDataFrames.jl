@@ -6,7 +6,7 @@ using ExtendedDates
 
 import Base: eachcol, eachrow, show
 
-export TimeDataFrame, periods, firstperiod, lastperiod, dataframe, innerjoin, outerjoin, lag, lead, ncol, nrow
+export TimeDataFrame, innerjoin, outerjoin
 
 mutable struct TimeDataFrame
     data::DataFrame
@@ -427,4 +427,5 @@ export continuous, dataframe, firstperiod, lastperiod, periods
 include("dataframe_functions.jl")
 include("timeseries_functions.jl")
 export lag, lead, align!
+
 end # module
