@@ -4,7 +4,9 @@ using CSV
 using DataFrames
 using ExtendedDates
 
-export TimeDataFrame, innerjoin, outerjoin
+import Base: eachcol, eachrow, show
+
+export TimeDataFrame, periods, firstperiod, lastperiod, dataframe, innerjoin, outerjoin, lag, lead, ncol, nrow
 
 mutable struct TimeDataFrame
     data::DataFrame
@@ -29,7 +31,7 @@ end
 function TimeDataFrame(filename::String, firstperiod::T) where T <: ExtendedDates.SimpleDate
     data = DataFrame(CSV.File(filename))
     continuous = true
-    periods = range(firstperiod, size(data, 1))
+    periods = range(firstperiod, length=size(data, 1), step = typeof(firstperiod - firstperiod)(1))
     TimeDataFrame(data, periods, true) 
 end
 
@@ -261,6 +263,7 @@ function Base.copy(bc::Base.Broadcast.Broadcasted{TimeDataFrameStyle})
         end
     end            
     colnames = unique!([_names(df) for df in bcf.args if df isa TimeDataFrame])
+    @show colnames
     if length(colnames) != 1
         wrongnames = setdiff(union(colnames...), intersect(colnames...))
         if isempty(wrongnames)
@@ -297,9 +300,6 @@ Base.ndims(::Type{<:TimeDataFrame}) = 2
 index(df::TimeDataFrame) = getfield(getfield(df, :data), :colindex)
 _columns(df::TimeDataFrame) = getfield(getfield(df, :data), :columns)
 
-# note: these type assertions are required to pass tests
-ncol(df::TimeDataFrame) = length(index(df))
-nrow(df::TimeDataFrame) = ncol(df) > 0 ? length(_columns(df)[1])::Int : 0
 import Base.size
 Base.size(df::TimeDataFrame) = (nrow(df), ncol(df))
 function Base.size(df::TimeDataFrame, i::Integer)
@@ -338,4 +338,93 @@ function outerjoin(d1::TimeDataFrame, d2::TimeDataFrame)
     return TimeDataFrame(sort!(DataFrames.outerjoin(data1, data2, on=:Column1),1), union(periods1, periods2), true)
 end
 
+function Base.show(io::IO, tdf::TimeDataFrame)
+    df = getfield(tdf, :data)
+    dfcopy = copy(df)
+    periods = getfield(tdf, :periods)
+    insertcols!(dfcopy, 1, :Periods => periods)
+    show(io, dfcopy, show_row_number = false, eltypes = false, summary = false)
+end
+
+function Base.show(tdf::TimeDataFrame)
+    df = getfield(tdf, :data)
+    dfcopy = copy(df)
+    periods = getfield(tdf, :periods)
+    insertcols!(dfcopy, 1, :Periods => periods)
+    show(dfcopy, show_row_number = false, eltypes = false, summary = false)
+end
+
+function Base.isequal(tdf1::TimeDataFrame, tdf2::TimeDataFrame)
+    isequal(getfield(tdf1, :data), getfield(tdf2, :data)) || return false
+    isequal(getfield(tdf1, :periods), getfield(tdf2, :periods)) || return false
+    getfield(tdf1, :continuous) == getfield(tdf2, :continuous) || return false
+    return true
+end
+
+"""
+    copy(tdf::TimeDataFrame; copycols::Bool=true)
+
+Copy time data frame `tdf`.
+If `copycols=true` (the default), return a new  `TimeDataFrame` holding
+copies of column vectors in `tdf`.
+If `copycols=false`, return a new `TimeDataFrame` sharing column vectors with `tdf`.
+"""
+function Base.copy(tdf::TimeDataFrame; copycols::Bool=true)
+    return TimeDataFrame(copy(dataframe(tdf), copycols=copycols), copy(periods(tdf)), continuous(tdf))
+end
+##############################################################################
+##
+## Equality
+##
+##############################################################################
+
+function Base.:(==)(tdf1::TimeDataFrame, tdf2::TimeDataFrame)
+    return isequal(tdf1, tdf2)
+end
+
+#=
+function Base.isequal(tdf1::TimeDataFrame, tdf2::TimeDataFrame)
+    size(tdf1, 2) == size(tdf2, 2) || return false
+    isequal(index(tdf1), index(tdf2)) || return false
+    isequal(continuous(tdf1), continuous(tdf2)) || return false
+    isequal(periods(tdf1), periods(tdf2)) || return false
+    isequal(dataframe(tdf1), dataframe(tdf2)) || return false
+    return true
+end
+=#
+"""
+    isapprox(tdf1::TimeDataFrame, tdf2::TimeDataFrame;
+             rtol::Real=atol>0 ? 0 : √eps, atol::Real=0,
+             nans::Bool=false, norm::Function=norm)
+
+Inexact equality comparison. `tdf1` and `tdf2` must have the same size, column names and periods.
+Return  `true` if `isapprox` with given keyword arguments
+applied to all pairs of columns stored in `df1` and `df2` returns `true`.
+"""
+function Base.isapprox(tdf1::TimeDataFrame, tdf2::TimeDataFrame;
+                       atol::Real=0, rtol::Real=atol>0 ? 0 : √eps(),
+                       nans::Bool=false, norm::Function=norm)
+    if size(tdf1) != size(tdf2)
+        throw(DimensionMismatch("dimensions must match: a has dims " *
+                                "$(size(tdf1)), b has dims $(size(tdf2))"))
+    end
+    if !isequal(index(tdf1), index(tdf2))
+        throw(ArgumentError("column names of passed time data frames do not match"))
+    end
+    if !isequal(periods(tdf1), periods(tdf2))
+        throw(ArgumentError("periods  of passed time data frames do not match"))
+    end
+    return isapprox(dataframe(tdf1), dataframe(tdf2), atol=atol, rtol=rtol, nans=nans, norm=norm)
+end
+
+Base.Matrix(tdf::TimeDataFrame) = Matrix(dataframe(tdf))
+Base.Matrix{T}(tdf::TimeDataFrame) where T = Matrix{T}(dataframe(tdf))
+Base.Array(tdf::TimeDataFrame) = Array(dataframe(tdf))
+Base.Array{T}(tdf::TimeDataFrame) where T = Array{T}(dataframe(tdf))
+
+include("accessors.jl")
+export continuous, dataframe, firstperiod, lastperiod, periods
+include("dataframe_functions.jl")
+include("timeseries_functions.jl")
+export lag, lead, align!
 end # module
