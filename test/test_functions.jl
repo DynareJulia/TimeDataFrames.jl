@@ -27,3 +27,38 @@ TimeDataFrames.align!(tdf1, tdf2)
 @test tdf2[2, 1] == tdf2_orig[1, 1]
 @test tdf2[5, 1] == tdf2_orig[4, 1]
 @test ismissing.(tdf2[1, 1])
+
+tdf1 = copy(tdf1_orig)
+tdf2 = copy(tdf2_orig)
+tdf = tdf1.x1 + tdf2.x2
+@test ismissing(tdf[1,1])
+@test ismissing(tdf[5,1])
+@test tdf[2,1] ≈ tdf1[2,1] + tdf2[1, 2]
+@test tdf[4,1] ≈ tdf1[4,1] + tdf2[3, 2]
+
+tdf1 = copy(tdf1_orig)
+tdf2 = copy(tdf2_orig)
+tdf = tdf1.x1 - tdf2.x2
+@test ismissing(tdf[1,1])
+@test ismissing(tdf[5,1])
+@test tdf[2,1] ≈ tdf1[2,1] - tdf2[1, 2]
+@test tdf[4,1] ≈ tdf1[4,1] - tdf2[3, 2]
+
+x1 = tdf1[!, :x1]
+lx1 = lag(x1)
+@test ismissing(lx1[1])
+@test lx1[2] == x1[1]
+@test collect(skipmissing(lag(x1, 2))) == collect(skipmissing(lag(lag(x1))))
+
+x1 = tdf1[!, :x1]
+lx1 = lead(x1)
+@test ismissing(lx1[end])
+@test lx1[1] == x1[2]
+@test collect(skipmissing(lead(x1, 2))) == collect(skipmissing(lead(lead(x1))))
+
+tdf2 = index(tdf1, SemesterDate(2001,1))
+df1 = dataframe(tdf1)
+df2 = dataframe(tdf2)
+for (i, c) in enumerate(eachcol(df2))
+    @test c .* df1[2, i]/100 ≈ df1[!, i]
+end

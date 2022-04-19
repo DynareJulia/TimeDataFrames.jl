@@ -6,7 +6,7 @@ using ExtendedDates
 
 import Base: eachcol, eachrow, show
 
-export TimeDataFrame, periods, firstperiod, lastperiod, dataframe, innerjoin, outerjoin, lag, lead, ncol, nrow
+export TimeDataFrame, periods, firstperiod, lastperiod, dataframe, innerjoin, outerjoin, lag, lead, ncol, nrow, index
 
 mutable struct TimeDataFrame
     data::DataFrame
@@ -261,17 +261,16 @@ function Base.copy(bc::Base.Broadcast.Broadcasted{TimeDataFrameStyle})
                 error("TimeDataFrames don't have the same continuous status")
             end
         end
-    end            
+    end
     colnames = unique!([_names(df) for df in bcf.args if df isa TimeDataFrame])
-    @show colnames
-    if length(colnames) != 1
+    if any(length(c) != 1 for c in colnames)
         wrongnames = setdiff(union(colnames...), intersect(colnames...))
         if isempty(wrongnames)
-            throw(ArgumentError("Column names in broadcasted data frames " *
+            throw(ArgumentError("Column names in broadcasted time data frames " *
                                 "must have the same order"))
         else
             msg = join(wrongnames, ", ", " and ")
-            throw(ArgumentError("Column names in broadcasted data frames must match. " *
+            throw(ArgumentError("Column names in broadcasted time data frames must match. " *
                                 "Non matching column names are $msg"))
         end
     end
@@ -292,7 +291,11 @@ function Base.copy(bc::Base.Broadcast.Broadcasted{TimeDataFrameStyle})
     return tdf
 end
 
-
+function Base.copyto!(tdf::TimeDataFrame, bc::Base.Broadcast.Broadcasted)
+    TimeDataFrame(copyto!(dataframe(tdf), bc),
+                  periods(tdf),
+                  iscontinuous(tdf))
+end
 
 
 Base.ndims(::TimeDataFrame) = 2
@@ -370,7 +373,7 @@ copies of column vectors in `tdf`.
 If `copycols=false`, return a new `TimeDataFrame` sharing column vectors with `tdf`.
 """
 function Base.copy(tdf::TimeDataFrame; copycols::Bool=true)
-    return TimeDataFrame(copy(dataframe(tdf), copycols=copycols), copy(periods(tdf)), continuous(tdf))
+    return TimeDataFrame(copy(dataframe(tdf), copycols=copycols), copy(periods(tdf)), iscontinuous(tdf))
 end
 ##############################################################################
 ##
@@ -382,16 +385,6 @@ function Base.:(==)(tdf1::TimeDataFrame, tdf2::TimeDataFrame)
     return isequal(tdf1, tdf2)
 end
 
-#=
-function Base.isequal(tdf1::TimeDataFrame, tdf2::TimeDataFrame)
-    size(tdf1, 2) == size(tdf2, 2) || return false
-    isequal(index(tdf1), index(tdf2)) || return false
-    isequal(continuous(tdf1), continuous(tdf2)) || return false
-    isequal(periods(tdf1), periods(tdf2)) || return false
-    isequal(dataframe(tdf1), dataframe(tdf2)) || return false
-    return true
-end
-=#
 """
     isapprox(tdf1::TimeDataFrame, tdf2::TimeDataFrame;
              rtol::Real=atol>0 ? 0 : √eps, atol::Real=0,
@@ -423,7 +416,7 @@ Base.Array(tdf::TimeDataFrame) = Array(dataframe(tdf))
 Base.Array{T}(tdf::TimeDataFrame) where T = Array{T}(dataframe(tdf))
 
 include("accessors.jl")
-export continuous, dataframe, firstperiod, lastperiod, periods
+export iscontinuous, dataframe, firstperiod, lastperiod, periods
 include("dataframe_functions.jl")
 include("timeseries_functions.jl")
 export lag, lead, align!

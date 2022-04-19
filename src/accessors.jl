@@ -23,7 +23,7 @@ returns the DataFrame inside the TimeDataFrame
 dataframe(tdf::TimeDataFrame) = getfield(tdf, :data)
 
 """
-    continuous(tdf::TimeDataFrame)
+    iscontinuous(tdf::TimeDataFrame)
 returns whether the TimeDataFrame is continuous
 """
-continuous(tdf::TimeDataFrame) = getfield(tdf, :continuous)
+iscontinuous(tdf::TimeDataFrame) = getfield(tdf, :continuous)
