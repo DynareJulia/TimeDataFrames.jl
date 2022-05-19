@@ -192,7 +192,6 @@ Base.getindex(df::TimeDataFrame, id1::Integer, id2::Integer) = getindex(getfield
 Base.getindex(df::TimeDataFrame, idx::CartesianIndex{2}) = df[idx[1], idx[2]]
 Base.getindex(df::TimeDataFrame, ::typeof(!), col_ind::Symbol) = getindex(getfield(df, :data), !, col_ind)
 Base.getindex(df::TimeDataFrame, ::typeof(!), col_ind::Union{Signed, Unsigned}) = getindex(getfield(df, :data), !, col_ind)
-
 Base.view(df::TimeDataFrame, idx::CartesianIndex{2}) = view(df, idx[1], idx[2])
 Base.setindex!(tdf::TimeDataFrame, val, idx::CartesianIndex{2}) =
     (tdf[idx[1], idx[2]] = val)
@@ -420,5 +419,6 @@ export iscontinuous, dataframe, firstperiod, lastperiod, periods
 include("dataframe_functions.jl")
 include("timeseries_functions.jl")
 export lag, lead, align!
+include("plot.jl")
 
 end # module
