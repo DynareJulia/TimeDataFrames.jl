@@ -14,7 +14,7 @@ function lag(x::AbstractVector{T}, k::Int64) where T
 end
 
 
-lag(tdf::TimeDataFrame, k::Int64) = TimeDataFrame(lag, tdf, k)
+lag(tdf::TimeDataFrame, k::Int64) = (k > 0) ? TimeDataFrame(lag, tdf, k) : TimeDataFrame(lead, tdf, -k)
 lag(x) = lag(x, 1)
 
 function lead(x::AbstractVector{T}, k::Int64) where T
